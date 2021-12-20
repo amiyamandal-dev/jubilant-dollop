@@ -1,0 +1,24 @@
+[package]
+name = "webTorrent"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+routerify = "2"
+hyper = { version = "0.14", features = ["full"] }
+futures = "0.3"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+url = "2"
+urlencoding = "2"
+portpicker = "0.1.1"
+serde_bencode = "^0.2"
+serde_derive = "*"
+serde_bytes = "*"
+magnet-url = "*"
+rand = "0.8"
+sha-1 = "0.10.0"
+hex-literal = "0.3.4"
