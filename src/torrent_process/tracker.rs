@@ -1,7 +1,7 @@
+use super::peers::Peer;
 use hyper::body::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_bencode::{from_bytes, to_bytes};
-use super::peers::Peer;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TrackerResp {

@@ -33,9 +33,17 @@ impl Peer {
         let num_peers = peers_blob.len() / PEERSIZE;
         for i in 0..num_peers {
             let offset = i * PEERSIZE;
-            let ip_v4 = bip_util::convert::bytes_be_to_ipv4(peers_blob[offset..offset + 4].try_into().expect("slice with incorrect length"));
-            let port = bip_util::convert::bytes_be_to_port(peers_blob[offset+4..offset+6].try_into().expect("slice with incorrect length"));
-            println!("{:?}:{}",ip_v4, port);
+            let ip_v4 = bip_util::convert::bytes_be_to_ipv4(
+                peers_blob[offset..offset + 4]
+                    .try_into()
+                    .expect("slice with incorrect length"),
+            );
+            let port = bip_util::convert::bytes_be_to_port(
+                peers_blob[offset + 4..offset + 6]
+                    .try_into()
+                    .expect("slice with incorrect length"),
+            );
+            println!("{:?}:{}", ip_v4, port);
         }
         Ok(p)
     }
