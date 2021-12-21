@@ -17,6 +17,7 @@ use url::Url;
 use urlencoding::{decode, decode_binary, encode, encode_binary};
 
 use super::peers::Peer;
+use super::tracker;
 use super::utils::generate_id;
 use super::Port;
 
@@ -203,8 +204,22 @@ impl ProcessTorrent {
         Ok(final_url.to_string())
     }
 
-    pub fn request_peers(&self) {
-        
+    pub async fn request_peers(&self) -> Result<(), Box<dyn Error>> {
+        let url = match self.build_tracker_URL() {
+            Ok(t) => t,
+            Err(e) => return Err(Box::new(GenericError(format!("{}", e.to_string())))),
+        };
+        let resp = match reqwest::get(url).await {
+            Ok(t) => t,
+            Err(e) => return Err(Box::new(GenericError(format!("{}", e.to_string())))),
+        };
+        let byte_response = match resp.bytes().await {
+            Ok(t) => t,
+            Err(e) => return Err(Box::new(GenericError(format!("{}", e.to_string())))),
+        };
+        // println!("{:x?}", byte_response);
+        let t = tracker::TrackerResp::new(byte_response);
+        Ok(())
     }
 }
 
@@ -218,5 +233,6 @@ mod tests {
             .unwrap();
         let url = t.build_tracker_URL().unwrap();
         println!("{:?}", url);
+        t.request_peers().await.unwrap();
     }
 }

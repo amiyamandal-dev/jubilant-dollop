@@ -1,7 +1,7 @@
 use hyper::{Body, Request, Response, Server, StatusCode};
 // Import the routerify prelude traits.
-extern crate serde_derive;
 extern crate serde_bytes;
+extern crate serde_derive;
 use routerify::prelude::*;
 use routerify::{Middleware, RequestInfo, Router, RouterService};
 use serde::{Deserialize, Serialize};
