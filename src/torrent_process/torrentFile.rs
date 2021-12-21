@@ -8,9 +8,22 @@ use serde::{Deserialize, Serialize};
 use serde_bencode::{de, to_bytes};
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use std::error::Error;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use tokio::fs::File;
 use tokio::io::{self, AsyncReadExt};
+
+#[derive(Debug)]
+pub struct GenericError(String);
+
+impl fmt::Display for GenericError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "There is an error: {}", self.0)
+    }
+}
+
+impl Error for GenericError {}
 
 #[derive(Debug, Deserialize, Serialize, Hash)]
 struct Node(String, i64);
@@ -73,24 +86,50 @@ impl TorrentFile {
         let mut f = File::open(file_name_with_path).await?;
         let mut buffer = Vec::new();
         f.read_to_end(&mut buffer).await?;
-        let t = match de::from_bytes::<TorrentFile>(&buffer) {
+        let mut t = match de::from_bytes::<TorrentFile>(&buffer) {
             Ok(t) => t,
             Err(e) => panic!("{:?}", e),
         };
         Ok(t)
     }
-    pub fn id(&self) -> String {
+    pub fn id(&self) -> Vec<u8> {
         let mut hasher = Sha1::new();
         let bencode_byte = match to_bytes(&self.info) {
             Ok(t) => t,
             Err(e) => panic!("{:?}", e),
         };
         hasher.update(bencode_byte);
-        let result = hasher.finalize();
-        println!("{}", result.len());
-        let r = format!("{:x}", result);
-        r
+        let result: Vec<u8> = hasher.finalize().to_vec();
+        // println!("{}", result.len());
+        // let r = format!("{:x}", result);
+        result
     }
+    pub fn split_piece_hashes(&self) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+        let hash_len = 20;
+        let mut temp_pieces = self.info.pieces.to_vec();
+        let mut piece_hashes: Vec<Vec<u8>> = Vec::new();
+        if self.info.pieces.len() % hash_len != 0 {
+            return Err(Box::new(GenericError(
+                format!(
+                    "Received malformed pieces of length {}",
+                    self.info.pieces.len()
+                )
+                .into(),
+            )));
+        }
+        for chunk in temp_pieces.chunks(hash_len){
+            piece_hashes.push(chunk.to_vec());
+        }
+        
+        Ok(piece_hashes)
+    }
+}
+
+pub struct ProcessTorrent {
+    t: TorrentFile,
+    info_hash: Vec<u8>,
+    piece_hashes: Vec<Vec<u8>>,
+    piece_length: i64,
 }
 
 #[cfg(test)]
@@ -104,5 +143,7 @@ mod tests {
         println!("{:?}", t.info.root_hash);
         let r = t.id();
         println!("{}", r.len());
+        let k = t.split_piece_hashes().unwrap();
+        println!("{:X?}", k[0]);
     }
 }
