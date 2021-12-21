@@ -234,6 +234,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "hex-literal"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -866,6 +872,7 @@ name = "webTorrent"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "hex",
  "hex-literal",
  "hyper",
  "magnet-url",

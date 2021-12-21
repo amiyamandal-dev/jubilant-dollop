@@ -2,17 +2,23 @@ extern crate serde;
 extern crate serde_bencode;
 extern crate serde_derive;
 
-use futures::future::err;
-use hex_literal::hex;
+use futures::future::ok;
 use serde::{Deserialize, Serialize};
 use serde_bencode::{de, to_bytes};
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use tokio::fs::File;
 use tokio::io::{self, AsyncReadExt};
+use url::Url;
+use urlencoding::{decode, decode_binary, encode, encode_binary};
+
+use super::peers::Peer;
+use super::utils::generate_id;
+use super::Port;
 
 #[derive(Debug)]
 pub struct GenericError(String);
@@ -24,9 +30,6 @@ impl fmt::Display for GenericError {
 }
 
 impl Error for GenericError {}
-
-#[derive(Debug, Deserialize, Serialize, Hash)]
-struct Node(String, i64);
 
 #[derive(Debug, Deserialize, Serialize, Hash)]
 struct FileType {
@@ -63,8 +66,6 @@ struct TorrentFile {
     #[serde(default)]
     announce: Option<String>,
     #[serde(default)]
-    nodes: Option<Vec<Node>>,
-    #[serde(default)]
     encoding: Option<String>,
     #[serde(default)]
     httpseeds: Option<Vec<String>>,
@@ -100,8 +101,6 @@ impl TorrentFile {
         };
         hasher.update(bencode_byte);
         let result: Vec<u8> = hasher.finalize().to_vec();
-        // println!("{}", result.len());
-        // let r = format!("{:x}", result);
         result
     }
     pub fn split_piece_hashes(&self) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
@@ -117,10 +116,10 @@ impl TorrentFile {
                 .into(),
             )));
         }
-        for chunk in temp_pieces.chunks(hash_len){
+        for chunk in temp_pieces.chunks(hash_len) {
             piece_hashes.push(chunk.to_vec());
         }
-        
+
         Ok(piece_hashes)
     }
 }
@@ -130,6 +129,83 @@ pub struct ProcessTorrent {
     info_hash: Vec<u8>,
     piece_hashes: Vec<Vec<u8>>,
     piece_length: i64,
+    peer_id: Vec<u8>,
+    peers: Option<Vec<Peer>>,
+}
+fn latin1_to_string(s: &Vec<u8>) -> String {
+    s.iter().map(|&c| c as char).collect()
+}
+
+impl ProcessTorrent {
+    pub async fn new(file_name_with_path: String) -> Result<Self, Box<dyn Error>> {
+        let t = match TorrentFile::new(file_name_with_path.clone()).await {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(Box::new(GenericError(format!(
+                    "error occur while processing {} -> {}",
+                    file_name_with_path, e
+                ))));
+            }
+        };
+        let piece_hashes = match t.split_piece_hashes() {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(Box::new(GenericError(format!(
+                    "error occur while processing {} -> {}",
+                    file_name_with_path, e
+                ))));
+            }
+        };
+        let piece_lenght = t.info.piece_length;
+        let info_hash = t.id();
+        let p = ProcessTorrent {
+            t,
+            info_hash: info_hash,
+            piece_hashes,
+            piece_length: piece_lenght,
+            peer_id: generate_id(),
+            peers: None,
+        };
+        Ok(p)
+    }
+
+    pub fn build_tracker_URL(&self) -> Result<String, Box<dyn Error>> {
+        let announce = match &self.t.announce {
+            Some(t) => t,
+            None => return Err(Box::new(GenericError(format!("No announce url exits")))),
+        };
+        let info_hash = encode_binary(&self.info_hash);
+        let mut peer_id = encode_binary(&self.peer_id);
+
+        let mut params: HashMap<String, String> = HashMap::new();
+        params.insert("port".to_string(), Port.to_string());
+        params.insert("uploaded".to_string(), "0".to_string());
+        params.insert("downloaded".to_string(), "0".to_string());
+        params.insert("compact".to_string(), "1".to_string());
+        params.insert("left".to_string(), self.piece_length.to_string());
+        params.insert("info_hash".to_string(), info_hash.to_string());
+        params.insert("peer_id".to_string(), peer_id.to_string());
+
+        let url = match Url::parse_with_params(&announce, params) {
+            Ok(t) => t,
+            Err(e) => return Err(Box::new(GenericError(format!("{}", e.to_string())))),
+        };
+        let url_str = url.to_string();
+        let final_url = match decode(&url_str) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(Box::new(GenericError(format!(
+                    "unable to genrate url {}",
+                    e
+                ))))
+            }
+        };
+        Ok(final_url.to_string())
+    }
+
+    pub fn request_peers(&self) {
+        
+    }
 }
 
 #[cfg(test)]
@@ -137,13 +213,10 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn test_code() {
-        let t = TorrentFile::new("archlinux-2019.12.01-x86_64.iso.torrent".to_string())
+        let mut t = ProcessTorrent::new("ubuntu-21.10-desktop-amd64.iso.torrent".to_string())
             .await
             .unwrap();
-        println!("{:?}", t.info.root_hash);
-        let r = t.id();
-        println!("{}", r.len());
-        let k = t.split_piece_hashes().unwrap();
-        println!("{:X?}", k[0]);
+        let url = t.build_tracker_URL().unwrap();
+        println!("{:?}", url);
     }
 }
