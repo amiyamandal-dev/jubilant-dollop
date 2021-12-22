@@ -18,8 +18,8 @@ impl Error for GenericError {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Peer {
-    IP: Ipv4Addr,
-    Port: u16,
+    pub IP: Ipv4Addr,
+    pub Port: u16,
 }
 
 impl Peer {
@@ -43,7 +43,11 @@ impl Peer {
                     .try_into()
                     .expect("slice with incorrect length"),
             );
-            println!("{:?}:{}", ip_v4, port);
+            let temp_peer = Peer {
+                IP: ip_v4,
+                Port: port,
+            };
+            p.push(temp_peer);
         }
         Ok(p)
     }

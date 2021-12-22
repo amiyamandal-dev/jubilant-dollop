@@ -131,10 +131,6 @@ pub struct ProcessTorrent {
     piece_hashes: Vec<Vec<u8>>,
     piece_length: i64,
     peer_id: Vec<u8>,
-    peers: Option<Vec<Peer>>,
-}
-fn latin1_to_string(s: &Vec<u8>) -> String {
-    s.iter().map(|&c| c as char).collect()
 }
 
 impl ProcessTorrent {
@@ -165,7 +161,6 @@ impl ProcessTorrent {
             piece_hashes,
             piece_length: piece_lenght,
             peer_id: generate_id(),
-            peers: None,
         };
         Ok(p)
     }
